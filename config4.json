@@ -1,0 +1,26 @@
+{
+    "levels": [
+      {
+        "layout": "level4.txt",
+        "time": 5,
+        "spawn_interval": 1,
+        "score_increase_from_hole_capture_modifier": 1,
+        "score_decrease_from_wrong_hole_modifier": 1,
+        "balls": ["blue", "orange", "grey", "blue", "green", "yellow"]
+      }
+    ],
+    "score_increase_from_hole_capture": {
+      "grey": 10,
+      "orange": 10,
+      "blue": 10,
+      "green": 10,
+      "yellow": 10
+    },
+    "score_decrease_from_wrong_hole": {
+      "grey": 0,
+      "orange": 5,
+      "blue": 5,
+      "green": 5,
+      "yellow": 5
+    }
+  }

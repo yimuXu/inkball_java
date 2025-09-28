@@ -1,0 +1,26 @@
+{
+    "levels": [
+      {
+        "layout": "levelend.txt",
+        "time": 100,
+        "spawn_interval": 1,
+        "score_increase_from_hole_capture_modifier": 1.0,
+        "score_decrease_from_wrong_hole_modifier": 1.0,
+        "balls": []
+      }
+    ],
+    "score_increase_from_hole_capture": {
+      "grey": 10,
+      "orange": 10,
+      "blue": 10,
+      "green": 10,
+      "yellow": 10
+    },
+    "score_decrease_from_wrong_hole": {
+      "grey": 0,
+      "orange": 5,
+      "blue": 5,
+      "green": 5,
+      "yellow": 0
+    }
+  }

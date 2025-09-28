@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>App.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">inkball_scaffold</a> &gt; <a href="index.source.html" class="el_package">inkball</a> &gt; <span class="el_source">App.java</span></div><h1>App.java</h1><pre class="source lang-java linenums">package inkball;
+
+import processing.core.PApplet;
+import processing.core.PImage;
+import processing.data.JSONArray;
+import processing.data.JSONObject;
+import processing.event.KeyEvent;
+import processing.event.MouseEvent;
+
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
+import java.io.*;
+import java.util.*;
+
+public class App extends PApplet {
+
+    public static final int CELLSIZE = 32; //8;
+    public static final int CELLHEIGHT = 32;
+
+    public static final int CELLAVG = 32;
+    public static final int TOPBAR = 64;
+<span class="fc" id="L23">    public static int WIDTH = 576; //CELLSIZE*BOARD_WIDTH;</span>
+<span class="fc" id="L24">    public static int HEIGHT = 640; //BOARD_HEIGHT*CELLSIZE+TOPBAR;</span>
+<span class="fc" id="L25">    public static final int BOARD_WIDTH = WIDTH/CELLSIZE;</span>
+    public static final int BOARD_HEIGHT = 20;
+
+    public static final int INITIAL_PARACHUTES = 1;
+
+    public static final int FPS = 30;
+
+    public String configPath;
+    public JSONObject json;
+    public JSONArray configs;
+    public JSONObject configs1;
+    public JSONObject configs2;
+    
+
+<span class="fc" id="L39">    public static Random random = new Random();</span>
+    public Wall[][] board;
+    public char[][] boardlayout;
+<span class="fc" id="L42">    public HashMap&lt;String, PImage&gt; sprites = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L43">    public HashMap&lt;String, String&gt; colorsprites = new HashMap&lt;&gt;();</span>
+    
+    public ArrayList&lt;Ball&gt; balls;
+    public ArrayList&lt;Ball&gt; ballinbox;
+    public ArrayList&lt;Spawner&gt; spawners;
+    public ArrayList&lt;Hole&gt; holes;
+    public ArrayList&lt;Wall&gt; acceleratedtile;
+
+    public ArrayList&lt;ArrayList&lt;Linesegment&gt;&gt; lines; 
+    public ArrayList&lt;Linesegment&gt; linesegments;
+    
+    private int starttime;
+    private int time;
+    private int spawnstarttime;
+    
+
+    private  int currenttime;// show the time at this frame;
+    private  int pauseat;// time of space is pressed.
+    private  int remaintime; // left time
+    private  int remaintimeofspawn;
+    private  int finaltime;// used to record the time number when this level is passed.
+
+<span class="fc" id="L65">    private int score = 0;</span>
+    private  int thislevelscore; // record the socre gained in this level, using when user restarted the game.
+    private  int greyball_rise;
+    private int orangeball_rise;
+    private int blueball_rise;
+    private int greenball_rise;
+    private int yellowball_rise;
+    private int greyball_down;
+    private int orangeball_down;
+    private int blueball_down;
+    private int greenball_down;
+    private int yellowball_down;
+    private int spawn_interval;
+    private float score_increase_from_hole_capture_modifier;
+    private float score_decrease_from_wrong_hole_modifier;
+
+    private boolean pause;// for pause the game
+    private boolean gameover;// if time is up
+
+
+    private boolean pass; // if all the balls were absorbed, pass this level successfully, move to next level.
+    private int a;// count the localion of the yellow tile at the end of this level.
+    private int b;
+
+<span class="fc" id="L89">    private int level = 0; // store the current level of board</span>
+    /**
+     * this method use a hashmap to store the image name and image location, user can easily load image by using the name of image.
+     * @param s the name of image.
+     */
+    public PImage getSprite(String s) {
+<span class="fc" id="L95">        PImage result = sprites.get(s);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (result == null) {</span>
+<span class="fc" id="L97">            result = loadImage(this.getClass().getResource(s+&quot;.png&quot;).getPath().replace(&quot;%20&quot;, &quot; &quot;));</span>
+<span class="fc" id="L98">            sprites.put(s, result);</span>
+        }
+<span class="fc" id="L100">        return result;</span>
+    }
+	
+	/**
+     * 
+     */
+
+<span class="fc" id="L107">    public App() {</span>
+<span class="fc" id="L108">        this.configPath = &quot;config.json&quot;;</span>
+        
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Initialise the setting of the window size.
+     */
+	@Override
+    public void settings() {
+<span class="fc" id="L117">        size(WIDTH, HEIGHT);</span>
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * Load all resources such as images. Initialise the elements such as the player and map elements.
+     * initialize all the array list that we need to use in the programme.
+     * put color and corresponding number in a map.
+     * read config json file, get all the data, create new ball, hole,spawner, wall and linesegment instances.
+     */
+	@Override
+    public void setup() {
+<span class="fc" id="L128">        frameRate(FPS);</span>
+<span class="fc" id="L129">        stroke(0);</span>
+<span class="fc" id="L130">        strokeWeight(10);</span>
+<span class="fc" id="L131">        lines = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L132">        balls = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L133">        ballinbox = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L134">        spawners = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L135">        holes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L136">        acceleratedtile = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L137">        pause = false;</span>
+<span class="fc" id="L138">        gameover = false;</span>
+<span class="fc" id="L139">        pass = false;</span>
+<span class="fc" id="L140">        thislevelscore = 0;</span>
+
+<span class="fc" id="L142">        colorsprites.put(&quot;grey&quot;,&quot;0&quot;);</span>
+<span class="fc" id="L143">        colorsprites.put(&quot;orange&quot;,&quot;1&quot;);</span>
+<span class="fc" id="L144">        colorsprites.put(&quot;blue&quot;,&quot;2&quot;);</span>
+<span class="fc" id="L145">        colorsprites.put(&quot;green&quot;,&quot;3&quot;);</span>
+<span class="fc" id="L146">        colorsprites.put(&quot;yellow&quot;,&quot;4&quot;);</span>
+        //read config.json file
+<span class="fc" id="L148">		json = loadJSONObject(configPath);</span>
+<span class="fc" id="L149">        configs = json.getJSONArray(&quot;levels&quot;);</span>
+<span class="fc" id="L150">        JSONObject config = configs.getJSONObject(level);</span>
+            //read layout of the board
+<span class="fc" id="L152">        String filename = config.getString(&quot;layout&quot;);</span>
+<span class="fc" id="L153">        spawn_interval = config.getInt(&quot;spawn_interval&quot;);</span>
+<span class="fc" id="L154">        score_increase_from_hole_capture_modifier = config.getInt(&quot;score_increase_from_hole_capture_modifier&quot;);</span>
+<span class="fc" id="L155">        score_decrease_from_wrong_hole_modifier = config.getInt(&quot;score_decrease_from_wrong_hole_modifier&quot;);</span>
+
+        // get timer
+<span class="fc" id="L158">        time = config.getInt(&quot;time&quot;);</span>
+<span class="fc" id="L159">        starttime = millis();</span>
+<span class="fc" id="L160">        spawnstarttime = millis();</span>
+<span class="fc" id="L161">        textAlign(CENTER, CENTER);</span>
+<span class="fc" id="L162">        textSize(20);</span>
+<span class="fc" id="L163">        fill(0);</span>
+
+        // initailze score and get score;
+        
+<span class="fc" id="L167">        configs1 = json.getJSONObject(&quot;score_increase_from_hole_capture&quot;);</span>
+<span class="fc" id="L168">        greyball_rise = configs1.getInt(&quot;grey&quot;);</span>
+<span class="fc" id="L169">        orangeball_rise = configs1.getInt(&quot;orange&quot;); </span>
+<span class="fc" id="L170">        blueball_rise = configs1.getInt(&quot;blue&quot;);</span>
+<span class="fc" id="L171">        greenball_rise = configs1.getInt(&quot;green&quot;);</span>
+<span class="fc" id="L172">        yellowball_rise = configs1.getInt(&quot;yellow&quot;);</span>
+<span class="fc" id="L173">        configs2 = json.getJSONObject(&quot;score_decrease_from_wrong_hole&quot;);</span>
+<span class="fc" id="L174">        greyball_down = configs1.getInt(&quot;grey&quot;);</span>
+<span class="fc" id="L175">        orangeball_down = configs1.getInt(&quot;orange&quot;);</span>
+<span class="fc" id="L176">        blueball_down = configs1.getInt(&quot;blue&quot;);</span>
+<span class="fc" id="L177">        greenball_down = configs1.getInt(&quot;green&quot;);</span>
+<span class="fc" id="L178">        yellowball_down = configs1.getInt(&quot;yellow&quot;);</span>
+        //initialize an array, store character from the layout in it.
+<span class="fc" id="L180">        int rowOfLayout = 0;</span>
+<span class="fc" id="L181">        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {</span>
+            String line;
+<span class="fc" id="L183">            line = reader.readLine();</span>
+<span class="fc" id="L184">            reader.close();</span>
+<span class="fc" id="L185">            BufferedReader reader1 = new BufferedReader(new FileReader(filename));</span>
+<span class="fc" id="L186">            boardlayout = new char[line.length()][line.length()];</span>
+<span class="fc" id="L187">            this.board = new Wall[line.length()][line.length()];            </span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            while ((line = reader1.readLine()) != null&amp;&amp;rowOfLayout&lt;18) {</span>
+<span class="fc" id="L189">                boardlayout[rowOfLayout]= line.toCharArray();</span>
+<span class="fc" id="L190">                rowOfLayout++;  </span>
+            }
+<span class="fc" id="L192">            reader1.close();</span>
+<span class="nc" id="L193">        } catch (IOException e) {</span>
+<span class="nc" id="L194">            e.printStackTrace();</span>
+<span class="fc" id="L195">        }</span>
+
+    
+        //load all the images.
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int i = 0; i &lt; 5; i++) {</span>
+<span class="fc" id="L200">            getSprite(&quot;wall&quot;+String.valueOf(i));</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int i = 0; i &lt; 5; i++) {</span>
+<span class="fc" id="L203">            getSprite(&quot;ball&quot;+String.valueOf(i));</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (int i = 0; i &lt; 5; i++) {</span>
+<span class="fc" id="L206">            getSprite(&quot;hole&quot;+String.valueOf(i));</span>
+        }
+<span class="fc" id="L208">        getSprite(&quot;tile&quot;);</span>
+<span class="fc" id="L209">        getSprite(&quot;entrypoint&quot;);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (int i =0; i&lt;this.board.length; i++){</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (int i1=0;i1&lt;this.board[i].length;i1++) {</span>
+<span class="fc" id="L212">                this.board[i][i1]= new Wall(i1,i);</span>
+            }
+        }
+       //create new tiles and put them in an array.
+
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int i=0; i&lt;boardlayout.length; i++) {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int i1 = 0; i1 &lt; boardlayout[i].length; i1++) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (boardlayout[i][i1]=='X') {</span>
+<span class="fc" id="L220">                    this.board[i][i1].setSprite(getSprite(&quot;wall0&quot;));</span>
+<span class="fc" id="L221">                    this.board[i][i1].setWall();</span>
+<span class="fc" id="L222">                    this.board[i][i1].setColour(&quot;grey&quot;);</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='1') {</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">                    if (i1 == 0 || i1 == boardlayout[i].length-1) {</span>
+<span class="fc" id="L226">                        this.board[i][i1].setSprite(getSprite(&quot;wall1&quot;));</span>
+<span class="fc" id="L227">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L228">                        this.board[i][i1].setColour(&quot;orange&quot;);</span>
+<span class="fc bfc" id="L229" title="All 4 branches covered.">                    } else if (boardlayout[i][i1-1]!='H'&amp;&amp;boardlayout[i][i1-1]!='B'){</span>
+<span class="fc" id="L230">                        this.board[i][i1].setSprite(getSprite(&quot;wall1&quot;));</span>
+<span class="fc" id="L231">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L232">                        this.board[i][i1].setColour(&quot;orange&quot;);</span>
+                    } else {
+<span class="fc" id="L234">                        this.board[i][i1].setSprite(getSprite(&quot;tile&quot;));</span>
+
+                    }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='2') {</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">                    if (i1 == 0 || i1 == boardlayout[i].length-1) {</span>
+<span class="fc" id="L239">                        this.board[i][i1].setSprite(getSprite(&quot;wall2&quot;));</span>
+<span class="fc" id="L240">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L241">                        this.board[i][i1].setColour(&quot;blue&quot;);</span>
+<span class="fc bfc" id="L242" title="All 4 branches covered.">                    } else if (boardlayout[i][i1-1] !='H'&amp;&amp;boardlayout[i][i1-1]!='B'){</span>
+<span class="fc" id="L243">                        this.board[i][i1].setSprite(getSprite(&quot;wall2&quot;));</span>
+<span class="fc" id="L244">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L245">                        this.board[i][i1].setColour(&quot;blue&quot;);</span>
+                    } else {
+<span class="fc" id="L247">                        this.board[i][i1].setSprite(getSprite(&quot;tile&quot;));</span>
+                    }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                } else if (boardlayout[i][i1 ]== '3') {</span>
+<span class="fc bfc" id="L250" title="All 4 branches covered.">                    if (i1 == 0 || i1 == boardlayout[i].length-1) {</span>
+<span class="fc" id="L251">                        this.board[i][i1].setSprite(getSprite(&quot;wall3&quot;));</span>
+<span class="fc" id="L252">                        this.board[i][i1].setColour(&quot;green&quot;);</span>
+<span class="fc" id="L253">                        this.board[i][i1].setWall();</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">                    } else if (boardlayout[i][i1-1]!='H'&amp;&amp;boardlayout[i][i1-1]!='B'){</span>
+<span class="fc" id="L255">                        this.board[i][i1].setSprite(getSprite(&quot;wall3&quot;));</span>
+<span class="fc" id="L256">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L257">                        this.board[i][i1].setColour(&quot;green&quot;);</span>
+                    } else {
+<span class="fc" id="L259">                        this.board[i][i1].setSprite(getSprite(&quot;tile&quot;));</span>
+                    }
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='4') {</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">                    if (i1==0 || i1 ==boardlayout[i].length-1) {</span>
+<span class="fc" id="L263">                        this.board[i][i1].setSprite(getSprite(&quot;wall4&quot;));</span>
+<span class="fc" id="L264">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L265">                        this.board[i][i1].setColour(&quot;yellow&quot;);</span>
+<span class="fc bfc" id="L266" title="All 4 branches covered.">                    } else if (boardlayout[i][i1-1]!='H'&amp;&amp;boardlayout[i][i1-1]!='B'){</span>
+<span class="fc" id="L267">                        this.board[i][i1].setSprite(getSprite(&quot;wall4&quot;));</span>
+<span class="fc" id="L268">                        this.board[i][i1].setWall();</span>
+<span class="fc" id="L269">                        this.board[i][i1].setColour(&quot;yellow&quot;);</span>
+                    } else {
+<span class="fc" id="L271">                        this.board[i][i1].setSprite(getSprite(&quot;tile&quot;));</span>
+                    }
+                    
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='S') {</span>
+<span class="fc" id="L275">                    this.board[i][i1].setSprite(getSprite(&quot;entrypoint&quot;));</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                    if(!this.board[i][i1].ifHasSpawner()){</span>
+<span class="fc" id="L277">                        Spawner s = new Spawner(i1, i);</span>
+<span class="fc" id="L278">                        this.board[i][i1].setSpawner();</span>
+<span class="fc" id="L279">                        spawners.add(s);                        </span>
+<span class="fc" id="L280">                    }</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='U') {</span>
+<span class="fc" id="L282">                    this.board[i][i1].setSprite(getSprite(&quot;up&quot;));</span>
+<span class="fc" id="L283">                    this.board[i][i1].setAcceleratedTile();</span>
+<span class="fc" id="L284">                    this.board[i][i1].setAcceleratedDirection(&quot;up&quot;);   </span>
+<span class="fc" id="L285">                    acceleratedtile.add(this.board[i][i1]);   </span>
+                    
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                }else if (boardlayout[i][i1]=='D') {</span>
+<span class="fc" id="L288">                    this.board[i][i1].setSprite(getSprite(&quot;down&quot;));</span>
+<span class="fc" id="L289">                    this.board[i][i1].setAcceleratedTile();</span>
+<span class="fc" id="L290">                    this.board[i][i1].setAcceleratedDirection(&quot;down&quot;); </span>
+<span class="fc" id="L291">                    acceleratedtile.add(this.board[i][i1]);   </span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='L') {</span>
+<span class="fc" id="L293">                    this.board[i][i1].setSprite(getSprite(&quot;left&quot;));</span>
+<span class="fc" id="L294">                    this.board[i][i1].setAcceleratedTile();        </span>
+<span class="fc" id="L295">                    this.board[i][i1].setAcceleratedDirection(&quot;left&quot;);                  </span>
+<span class="fc" id="L296">                    acceleratedtile.add(this.board[i][i1]);   </span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">                } else if (boardlayout[i][i1]=='R') {</span>
+<span class="fc" id="L298">                    this.board[i][i1].setSprite(getSprite(&quot;right&quot;));</span>
+<span class="fc" id="L299">                    this.board[i][i1].setAcceleratedTile(); </span>
+<span class="fc" id="L300">                    this.board[i][i1].setAcceleratedDirection(&quot;right&quot;); </span>
+<span class="fc" id="L301">                    acceleratedtile.add(this.board[i][i1]);   </span>
+                } else {
+<span class="fc" id="L303">                    this.board[i][i1].setSprite(getSprite(&quot;tile&quot;));</span>
+                }
+<span class="fc" id="L305">                this.board[i][i1].draw(this);</span>
+            }
+        }
+        // draw holes
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (int i=0; i&lt;boardlayout.length; i++ ) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (int i1=0; i1&lt;boardlayout[i].length; i1++) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                if (boardlayout[i][i1]=='H') {</span>
+<span class="fc" id="L312">                    char colnum = boardlayout[i][i1+1];//number of color;</span>
+
+<span class="fc" id="L314">                    this.board[i][i1].setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+                    Hole h;
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                    if (colnum == '0') {</span>
+<span class="fc" id="L317">                        h = new Hole(i1, i,&quot;grey&quot;);</span>
+<span class="fc" id="L318">                        h.setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+<span class="fc" id="L319">                        holes.add(h);</span>
+<span class="fc" id="L320">                        this.board[i][i1].draw(this);                        </span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                    } else if (colnum == '1') {</span>
+<span class="fc" id="L322">                        h = new Hole(i1, i,&quot;orange&quot;);</span>
+<span class="fc" id="L323">                        h.setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+<span class="fc" id="L324">                        holes.add(h);</span>
+<span class="fc" id="L325">                        this.board[i][i1].draw(this); </span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                    } else if (colnum == '2') {</span>
+<span class="fc" id="L327">                        h = new Hole(i1, i,&quot;blue&quot;);</span>
+<span class="fc" id="L328">                        h.setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+<span class="fc" id="L329">                        holes.add(h);</span>
+<span class="fc" id="L330">                        this.board[i][i1].draw(this); </span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                    } else if (colnum == '3') {</span>
+<span class="fc" id="L332">                        h = new Hole(i1, i,&quot;green&quot;);</span>
+<span class="fc" id="L333">                        h.setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+<span class="fc" id="L334">                        holes.add(h);</span>
+<span class="fc" id="L335">                        this.board[i][i1].draw(this); </span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">                    } else if (colnum == '4') {</span>
+<span class="fc" id="L337">                        h = new Hole(i1, i,&quot;yellow&quot;);</span>
+<span class="fc" id="L338">                        h.setSprite(getSprite(&quot;hole&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+<span class="fc" id="L339">                        holes.add(h);</span>
+<span class="fc" id="L340">                        this.board[i][i1].draw(this); </span>
+                    }
+                }
+            }
+        }
+        //create initial ball.        
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (int i=0; i&lt;boardlayout.length; i++) {</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            for (int i1=0; i1&lt;boardlayout[i].length; i1++) {</span>
+<span class="pc bpc" id="L348" title="1 of 4 branches missed.">                if (boardlayout[i][i1]=='B'&amp;&amp;!this.board[i][i1].ifHasFirstBall()) {</span>
+<span class="fc" id="L349">                    this.board[i][i1].setFirstBall();</span>
+<span class="fc" id="L350">                    Ball ball = new Ball();</span>
+<span class="fc" id="L351">                    ball.initializeVel();</span>
+<span class="fc" id="L352">                    ball.setOnBoard();</span>
+<span class="fc" id="L353">                    ball.setCoordinate(i1, i);</span>
+<span class="fc" id="L354">                    balls.add(ball);</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                    if (boardlayout[i][i1+1]=='0'){</span>
+<span class="fc" id="L356">                        ball.setColour(&quot;grey&quot;);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                    } else if (boardlayout[i][i1+1]=='1') {</span>
+<span class="fc" id="L358">                        ball.setColour(&quot;orange&quot;);</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                    } else if (boardlayout[i][i1+1]=='2') {</span>
+<span class="fc" id="L360">                        ball.setColour(&quot;blue&quot;);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                    } else if (boardlayout[i][i1+1]=='3') {</span>
+<span class="fc" id="L362">                        ball.setColour(&quot;green&quot;);</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                    } else if (boardlayout[i][i1+1]=='4') {</span>
+<span class="fc" id="L364">                        ball.setColour(&quot;yellow&quot;);</span>
+                    }
+<span class="fc" id="L366">                    ball.setSprite(getSprite(&quot;ball&quot;+String.valueOf(boardlayout[i][i1+1])));</span>
+                    
+
+                }
+                
+            }
+        }
+        // put the ball from json file into a new list that store the ball wait to be spawned.
+<span class="fc" id="L374">        JSONArray colours = config.getJSONArray(&quot;balls&quot;);</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        for (int i = 0; i &lt; colours.size();i++) {</span>
+<span class="fc" id="L376">            Ball b = new Ball();</span>
+<span class="fc" id="L377">            b.initializeVel();</span>
+<span class="fc" id="L378">            ballinbox.add(b);</span>
+
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (colours.get(i).equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L381">                b.setSprite(getSprite(&quot;ball0&quot;));</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            } else if (colours.get(i).equals(&quot;orange&quot;)) {</span>
+<span class="fc" id="L383">                b.setSprite(getSprite(&quot;ball1&quot;));</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            } else if (colours.get(i).equals(&quot;blue&quot;)) {</span>
+<span class="fc" id="L385">                b.setSprite(getSprite(&quot;ball2&quot;));</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            } else if (colours.get(i).equals(&quot;green&quot;)) {</span>
+<span class="fc" id="L387">                b.setSprite(getSprite(&quot;ball3&quot;));</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            } else if (colours.get(i).equals(&quot;yellow&quot;)) {</span>
+<span class="fc" id="L389">                b.setSprite(getSprite(&quot;ball4&quot;));</span>
+            }
+<span class="fc" id="L391">            b.setColour(colours.getString(i));</span>
+<span class="fc" id="L392">            balls.add(b);</span>
+        }
+<span class="fc" id="L394">        linesegments = new ArrayList&lt;&gt;();</span>
+        //display the ball that are about to be spawned.
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (ballinbox.size()!=0) {</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            for ( int i = 0; i&lt;ballinbox.size();i++) {</span>
+<span class="fc" id="L398">                ballinbox.get(i).setCoordinate(23+i*30,23);</span>
+            }            
+        }
+
+<span class="fc" id="L402">    }</span>
+    /**
+     * implenment ending animation.
+     */
+    public void endanimation() {
+<span class="fc" id="L407">        image(getSprite(&quot;wall4&quot;),board[a][b].getXcoordinate(),board[a][b].getYcoordinate());</span>
+<span class="nc" id="L408">        image(getSprite(&quot;wall4&quot;),board[17-a][17-b].getXcoordinate(),board[17-a][17-b].getYcoordinate());</span>
+<span class="nc" id="L409">    }</span>
+    /**
+     * Receive key pressed signal from the keyboard.
+     * if key is space, change the statement of &quot;pause&quot;,if key is &quot;r&quot;, restart the game.
+     */
+    char lastpressedkey;
+    @Override
+    public void keyPressed(KeyEvent event) {
+        
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (key == ' ') {</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            if (pause) {</span>
+<span class="nc" id="L420">                pause = false;</span>
+<span class="nc" id="L421">                starttime = millis()-(time*1000 - pauseat);</span>
+<span class="nc" id="L422">                spawnstarttime = millis() - (spawn_interval * 1000 - remaintimeofspawn);</span>
+
+            } else {
+<span class="nc" id="L425">                pause = true;</span>
+<span class="nc" id="L426">                textSize(30);</span>
+<span class="nc" id="L427">                text(&quot;***PAUSED***&quot;,300,30);</span>
+<span class="nc" id="L428">                pauseat = remaintime;</span>
+            }
+        }
+<span class="nc bnc" id="L431" title="All 4 branches missed.">        if (key == 'r'||key == 'R') {</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            if (gameover) {</span>
+<span class="nc" id="L433">                level = 0;</span>
+<span class="nc" id="L434">                setup();</span>
+<span class="nc" id="L435">                score = 0;                </span>
+            } else {
+<span class="nc" id="L437">                score -= thislevelscore;</span>
+<span class="nc" id="L438">                setup();</span>
+    
+            }
+
+        }
+<span class="nc" id="L443">        lastpressedkey = key;</span>
+<span class="nc" id="L444">    }</span>
+
+    public char getLastPressedKey() {
+<span class="nc" id="L447">        return lastpressedkey;</span>
+    }
+
+    /**
+     * Receive key released signal from the keyboard.
+     */
+	@Override
+    public void keyReleased() {
+
+<span class="nc" id="L456">    }</span>
+    private int startx;
+    private int starty;
+    /**
+     * receive mouse pressed signal from the mouse.
+     */
+    @Override
+    public void mousePressed(MouseEvent e) {
+        // create a new player-drawn line object
+<span class="nc bnc" id="L465" title="All 2 branches missed.">        if (mouseButton == LEFT) {</span>
+<span class="nc" id="L466">            startx = mouseX;</span>
+<span class="nc" id="L467">            starty = mouseY;</span>
+<span class="nc" id="L468">            linesegments = new ArrayList&lt;&gt;();            </span>
+        }
+
+<span class="nc" id="L471">    }</span>
+    /**
+     * receive mouse dragging signal from the mouse.
+     * keep creating new linesegment instances.
+     */
+	@Override
+    public void mouseDragged(MouseEvent e) {
+        // add line segments to player-drawn line object if left mouse button is held
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (mouseButton == LEFT) {</span>
+<span class="nc" id="L480">            Linesegment line = new Linesegment(startx,starty,mouseX,mouseY);</span>
+<span class="nc" id="L481">            linesegments.add(line);</span>
+            //line(startx,starty,mouseX,mouseY);
+<span class="nc" id="L483">            startx = mouseX;</span>
+<span class="nc" id="L484">            starty = mouseY;            </span>
+        }
+<span class="nc" id="L486">    }</span>
+    /**
+     * receive mouse release signal from the mouse.
+     * add new linesegment instances into list.
+     */
+    @Override
+    public void mouseReleased(MouseEvent e) {
+<span class="nc" id="L493">        lines.add(linesegments);</span>
+
+<span class="nc" id="L495">    }</span>
+
+
+    
+    /**
+     * calculate the socre based on the color of the hole and the ball.
+     * @param ballcolor the color of the ball
+     * @param holecolor the color of the hole that the ball get in.
+     * @return score
+     */
+    public int getscore(String ballcolor,String holecolor){
+
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (ballcolor.equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L508">            score += greyball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc" id="L509">            thislevelscore += greyball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        } else if (ballcolor.equals(&quot;orange&quot;)) {</span>
+<span class="pc bpc" id="L511" title="3 of 4 branches missed.">            if (ballcolor.equals(holecolor) || holecolor.equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L512">            score += orangeball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc" id="L513">            thislevelscore += orangeball_rise * score_increase_from_hole_capture_modifier;</span>
+            } else {
+<span class="nc" id="L515">                score -= orangeball_down * score_decrease_from_wrong_hole_modifier;</span>
+<span class="nc" id="L516">                thislevelscore -= orangeball_down * score_decrease_from_wrong_hole_modifier;</span>
+            }
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        } else if (ballcolor.equals(&quot;blue&quot;)) {</span>
+<span class="pc bpc" id="L519" title="3 of 4 branches missed.">            if (ballcolor.equals(holecolor) || holecolor.equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L520">            score += blueball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc" id="L521">            thislevelscore += blueball_rise * score_increase_from_hole_capture_modifier;</span>
+            } else {
+<span class="nc" id="L523">                score -= blueball_down * score_decrease_from_wrong_hole_modifier;</span>
+<span class="nc" id="L524">                thislevelscore -= blueball_down * score_decrease_from_wrong_hole_modifier;</span>
+            }
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        } else if (ballcolor.equals(&quot;green&quot;)) {</span>
+<span class="pc bpc" id="L527" title="1 of 4 branches missed.">            if (ballcolor.equals(holecolor) || holecolor.equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L528">            score += greenball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc" id="L529">            thislevelscore += greenball_rise * score_increase_from_hole_capture_modifier;</span>
+
+            } else {
+<span class="fc" id="L532">                score -= greenball_down * score_decrease_from_wrong_hole_modifier;</span>
+<span class="fc" id="L533">                thislevelscore -= greenball_down * score_decrease_from_wrong_hole_modifier;</span>
+            }
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">        } else if (ballcolor.equals(&quot;yellow&quot;)) {</span>
+<span class="pc bpc" id="L536" title="2 of 4 branches missed.">            if (ballcolor.equals(holecolor) || holecolor.equals(&quot;grey&quot;)) {</span>
+<span class="fc" id="L537">            score += yellowball_rise * score_increase_from_hole_capture_modifier;</span>
+<span class="fc" id="L538">            thislevelscore += yellowball_rise * score_increase_from_hole_capture_modifier;</span>
+            } else {
+<span class="nc" id="L540">                score -= yellowball_down * score_decrease_from_wrong_hole_modifier;</span>
+<span class="nc" id="L541">                thislevelscore -= yellowball_down * score_decrease_from_wrong_hole_modifier;</span>
+            }
+        }
+<span class="fc" id="L544">        return score;</span>
+    }
+    /**
+     * use for loop to draw all the lines that not be collided
+     */
+    public void drawAllline() {
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        if(lines.size() !=0 ){</span>
+<span class="fc bfc" id="L551" title="All 2 branches covered.">            for (ArrayList&lt;Linesegment&gt; line : lines) {//entire line</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">                if(linesegments.size() != 0){</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">                    for (Linesegment l : line) {//line segment   </span>
+                    
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                        if (!l.getCollision()) {</span>
+<span class="fc" id="L556">                            stroke(0);</span>
+<span class="fc" id="L557">                            strokeWeight(10);</span>
+<span class="fc" id="L558">                            line(l.getstartx(),l.getstarty(),l.getendx(),l.getendy());</span>
+
+                        }
+                        
+<span class="fc" id="L562">                    }                    </span>
+                }
+            
+<span class="fc" id="L565">            }            </span>
+        }
+
+<span class="fc" id="L568">    }</span>
+    /**
+     * draw current line that haven been added into lines list.
+     */
+    public void drawCurrentline(){
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        if(linesegments.size() != 0){</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">            for (Linesegment l : linesegments) {//line segment </span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                if (!l.getCollision()) {</span>
+<span class="fc" id="L576">                    stroke(0);</span>
+<span class="fc" id="L577">                    strokeWeight(10);</span>
+<span class="fc" id="L578">                    line(l.getstartx(),l.getstarty(),l.getendx(),l.getendy());</span>
+                }  
+                
+<span class="fc" id="L581">            }            </span>
+        }
+
+<span class="fc" id="L584">    }</span>
+    /**
+     * check if there are balls on bar, and balls on board, 
+     * if there are no ball on bar and on board
+     * display ending animation.
+     */
+    public void levelend(){
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (ballinbox.size() == 0) {</span>
+<span class="fc" id="L592">            int countabsorbedball = 0;</span>
+<span class="fc bfc" id="L593" title="All 2 branches covered.">            for (Ball b: balls) {</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                if (b.absorption()) {</span>
+<span class="nc" id="L595">                    countabsorbedball ++;</span>
+                }
+<span class="fc" id="L597">            }</span>
+            // display the ending animation by check if there is no ball on board and on bar.
+<span class="fc bfc" id="L599" title="All 2 branches covered.">            if (countabsorbedball == balls.size()) {</span>
+<span class="fc" id="L600">                pass = true;</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">                if ( frameCount%2==0) {</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                    if (finaltime != 0) {</span>
+<span class="nc" id="L603">                        finaltime--;</span>
+<span class="nc" id="L604">                        score++;</span>
+<span class="nc bnc" id="L605" title="All 4 branches missed.">                        if (a==0 &amp;&amp; b&lt;17) {</span>
+<span class="nc" id="L606">                            b++;</span>
+<span class="nc bnc" id="L607" title="All 4 branches missed.">                        } else if (b==17 &amp;&amp; a&lt;17) {</span>
+<span class="nc" id="L608">                            a++;</span>
+<span class="nc bnc" id="L609" title="All 4 branches missed.">                        } else if (b&gt;0 &amp;&amp; a==17 ) {</span>
+<span class="nc" id="L610">                            b--;</span>
+<span class="nc bnc" id="L611" title="All 4 branches missed.">                        } else if (b==0 &amp;&amp; a&gt;0) {</span>
+<span class="nc" id="L612">                            a--;</span>
+                        }                      
+                    }                  
+                }
+<span class="nc" id="L616">                endanimation();</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                if (finaltime == 0) {</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                    if (level == configs.size()-1) {</span>
+<span class="nc" id="L619">                        gameover = true;</span>
+<span class="nc" id="L620">                        fill(0);</span>
+<span class="nc" id="L621">                        textSize(40);</span>
+<span class="nc" id="L622">                        text(&quot;==ENDED==&quot;, 300 , 50);</span>
+                    } else {
+<span class="nc" id="L624">                        level++;</span>
+<span class="nc" id="L625">                        setup();</span>
+                    }
+                    
+
+                }
+            }
+        }
+<span class="fc" id="L632">    }</span>
+    /**
+     * draw balls on bar and handling movement of balls on bar
+     */
+    public void drawballonBar() {
+<span class="fc" id="L637">        fill(0);</span>
+<span class="fc" id="L638">                noStroke();</span>
+<span class="fc" id="L639">                rect(20,20,150,30);</span>
+                //display the ball on board
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">                if(balls.size() != 0){</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">                    for (Ball b: balls) {</span>
+<span class="pc bpc" id="L643" title="1 of 4 branches missed.">                        if (b.getOnBoard()&amp;&amp;!b.absorption()) {</span>
+<span class="fc" id="L644">                            b.draw(this);</span>
+                        }
+<span class="fc" id="L646">                    }                    </span>
+                }
+
+                
+                //control the ball in the topbar moving leftward when the first ball was spawned.
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                if (ballinbox.size()!=0) {</span>
+<span class="fc" id="L652">                    int x = 0;</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">                    if (ballinbox.get(0).getXcoordinate()&gt;23) {</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">                        for (Ball b : ballinbox) {         </span>
+<span class="fc" id="L655">                            b.setvelonbar();</span>
+<span class="fc" id="L656">                            image(b.getSprite(), (float)b.getXcoordinate()-x,(float) b.getYcoordinate());</span>
+<span class="fc" id="L657">                            x++;</span>
+<span class="fc" id="L658">                        }</span>
+                    } else {
+<span class="fc bfc" id="L660" title="All 2 branches covered.">                        for (Ball b : ballinbox) { </span>
+<span class="fc" id="L661">                            image(b.getSprite(), (float)b.getXcoordinate(),(float) b.getYcoordinate());</span>
+<span class="fc" id="L662">                        }</span>
+                    }                      
+                }
+                //draw a rectangle to cover the ball outside of black bar.
+<span class="fc" id="L666">                fill(255);</span>
+<span class="fc" id="L667">                noStroke();</span>
+<span class="fc" id="L668">                rect(170,20,150,30);</span>
+<span class="fc" id="L669">    }</span>
+    /**
+     * display the score
+     */
+    public void drawScore() {
+<span class="fc" id="L674">        fill(0);</span>
+<span class="fc" id="L675">        textSize(20);</span>
+<span class="fc" id="L676">        text(&quot;Score : &quot;+score,500,30);</span>
+
+<span class="fc" id="L678">    }</span>
+    /**
+     * when spawning time is up, randomly choose a spawner to spawn the ball on board.
+     */
+    public void spawnBallOnBar() {
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        if (ballinbox.size()!=0) {</span>
+<span class="fc bfc" id="L684" title="All 2 branches covered.">            if (remaintimeofspawn &lt;=0) {</span>
+<span class="fc" id="L685">                spawnstarttime = millis();</span>
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">                if (ballinbox.size()!=0) {</span>
+<span class="fc" id="L687">                    ballinbox.get(0).setOnBoard(); </span>
+<span class="nc" id="L688">                    int spawnlocation = random.nextInt(spawners.size());</span>
+<span class="nc" id="L689">                    ballinbox.get(0).setCoordinate(spawners.get(spawnlocation).getx(), spawners.get(spawnlocation).gety());</span>
+<span class="nc" id="L690">                    ballinbox.remove(0);</span>
+
+                }
+            }
+        }
+<span class="fc" id="L695">    }</span>
+    /**
+     * display the interval of next spawn
+     */
+    public void drawspawntime(){
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (!pause) {</span>
+<span class="fc" id="L701">            int currenttime1 = millis();</span>
+<span class="fc" id="L702">            int interval = currenttime1 - spawnstarttime;</span>
+<span class="fc" id="L703">            remaintimeofspawn = spawn_interval*1000 - interval;</span>
+        }
+<span class="fc bfc" id="L705" title="All 2 branches covered.">        if (ballinbox.size() != 0) {</span>
+<span class="fc" id="L706">            fill(0);</span>
+<span class="fc" id="L707">            textSize(20);</span>
+<span class="fc" id="L708">            String timeString = nf((float)remaintimeofspawn/1000, 0, 1);</span>
+<span class="fc" id="L709">            text(timeString,210,35);                    </span>
+        }        
+<span class="fc" id="L711">    }</span>
+    /**
+     * display the remainning game time
+     */
+    public void drawgametime(){
+<span class="fc" id="L716">        currenttime = millis();            </span>
+<span class="fc" id="L717">        int passingtime = currenttime-starttime;</span>
+<span class="fc" id="L718">        remaintime = time*1000 - passingtime;</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">        if (!pass) {</span>
+<span class="fc" id="L720">            finaltime = remaintime/1000;</span>
+        }
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">        if (!pass) {</span>
+<span class="fc" id="L723">            fill(0);</span>
+<span class="fc" id="L724">            textSize(20);</span>
+<span class="fc" id="L725">            text(&quot;Time : &quot; + remaintime/1000, 500,50);                    </span>
+        } else {
+<span class="nc" id="L727">            fill(0);</span>
+<span class="nc" id="L728">            textSize(20);</span>
+<span class="nc" id="L729">            text(&quot;Time : &quot; + finaltime, 500,50);</span>
+        }
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">        if (remaintime/1000 == 0) {</span>
+<span class="nc" id="L732">            textSize(50);</span>
+<span class="nc" id="L733">            text(&quot;===TIME'S UP===&quot;,300,30);</span>
+<span class="nc" id="L734">            gameover = true;</span>
+        } 
+<span class="fc" id="L736">    }</span>
+    /**
+     * Draw all elements in the game by current frame.
+     */
+	@Override
+    public void draw() {
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        if (!gameover) {</span>
+<span class="pc bpc" id="L743" title="1 of 2 branches missed.">            if (!pause) {</span>
+<span class="fc" id="L744">                background(255,255,255);//white background</span>
+                //display Board for current level:
+<span class="fc bfc" id="L746" title="All 2 branches covered.">                for(int i=0; i&lt;boardlayout.length; i++){</span>
+<span class="fc bfc" id="L747" title="All 2 branches covered.">                    for(int i1=0; i1&lt;boardlayout[i].length; i1++){</span>
+<span class="fc" id="L748">                        this.board[i][i1].draw(this); </span>
+                    }
+                }
+                //print the hole
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                for (Hole h: holes) {</span>
+<span class="fc" id="L753">                    h.draw(this);</span>
+<span class="fc" id="L754">                }</span>
+<span class="fc" id="L755">                drawAllline();//draw all the line that have not be collided with               </span>
+<span class="fc" id="L756">                drawballonBar();// display the ball in the bar.            </span>
+<span class="fc" id="L757">                drawgametime();//calculate remainning time</span>
+<span class="fc" id="L758">                drawspawntime(); //calculate the sprawn interval and display remainning time.           </span>
+<span class="fc" id="L759">                spawnBallOnBar();//spawn the first ball on bar when countdown time reach 0.</span>
+<span class="fc" id="L760">                drawScore();//draw the score</span>
+<span class="fc" id="L761">                levelend();//display game end message</span>
+            }
+<span class="fc" id="L763">            drawCurrentline(); //print the current line that is being draw</span>
+  
+        }
+<span class="fc" id="L766">    }</span>
+
+
+    public static void main(String[] args) {
+<span class="nc" id="L770">        PApplet.main(&quot;inkball.App&quot;);</span>
+<span class="nc" id="L771">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

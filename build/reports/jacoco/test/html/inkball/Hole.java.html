@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Hole.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">inkball_scaffold</a> &gt; <a href="index.source.html" class="el_package">inkball</a> &gt; <span class="el_source">Hole.java</span></div><h1>Hole.java</h1><pre class="source lang-java linenums">package inkball;
+
+import com.jogamp.common.net.PiggybackURLConnection;
+
+import processing.core.PImage;
+
+public class Hole {
+    private int x;
+    private int y;
+    private String color;
+    private PImage sprite;
+    /**
+     * constructor of Ball 
+     * @param x cooridnate
+     * @param y coordinate
+     * @param c color
+     */
+<span class="fc" id="L18">    public Hole(int x, int y, String c){</span>
+<span class="fc" id="L19">        this.x = x;</span>
+<span class="fc" id="L20">        this.y = y;</span>
+<span class="fc" id="L21">        color = c;</span>
+<span class="fc" id="L22">    }</span>
+    /**
+     * get center X coordinate
+     * @param app
+     * @return center x coordinate
+     */
+    public int getcenterXcoordinate(App app){
+<span class="fc" id="L29">        int X = (x)*App.CELLSIZE + app.getSprite(&quot;hole0&quot;).width/2;//</span>
+<span class="fc" id="L30">        return X;</span>
+    }
+    /** 
+    * get center Y coordinate
+    * @param app
+    * @return center Y coordinate
+    */
+    public int getcenterYcoordinate(App app){
+<span class="fc" id="L38">        int Y = (y)*App.CELLSIZE  + app.getSprite(&quot;hole0&quot;).width/2 + App.TOPBAR;//</span>
+<span class="fc" id="L39">        return Y;</span>
+    }
+    /**
+     * set a PImage as hole's sprite
+     * @param img
+     */
+    public void setSprite(PImage img){
+<span class="fc" id="L46">        this.sprite = img;</span>
+<span class="fc" id="L47">    }</span>
+    /**
+     * get color of the hole
+     * @return color
+     */
+    public String getColor(){
+<span class="nc" id="L53">        return this.color;</span>
+    }
+    /**
+     * draw the hole
+     * @param app
+     */
+    public void draw(App app){
+<span class="fc" id="L60">        app.image(sprite,(float)x*App.CELLSIZE,(float)(y*App.CELLSIZE + App.TOPBAR));</span>
+<span class="fc" id="L61">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
